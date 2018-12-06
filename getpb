@@ -32,3 +32,4 @@ fi
 	echo
 
 	cat /tmp/getpb/"${1}"/PKGBUILD*
+
