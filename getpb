@@ -1,0 +1,34 @@
+#!/bin/bash
+# getpb 2018-12-05
+# fetches PKGBUILD's and creates SCRINFO for official or AUR packages.
+#
+# [[ $var2 = aur ]] is for my local "aur" repo. Set this as required.
+#
+
+var2=$(sudo pacman -Si "${1}" 2>/dev/null | awk '/Repository/ {print $3}')
+
+if	[[ -d /tmp/getpb/"${1}" ]]; then sudo rm -rd /tmp/getpb/"${1}"
+fi
+
+if	[[ -z $var2 ]] || [[ $var2 = aur ]]; then
+	wget -qP /tmp/getpb/"${1}" https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h="$1"
+	mv /tmp/getpb/"${1}"/PKGBUILD*  /tmp/getpb/"${1}"/PKGBUILD
+fi
+
+if	[[ $var2 = community ]]; then
+	wget -qP /tmp/getpb/"${1}" https://git.archlinux.org/svntogit/community.git/plain/trunk/PKGBUILD?h=packages/"${1}"
+	mv /tmp/getpb/"${1}"/PKGBUILD*  /tmp/getpb/"${1}"/PKGBUILD
+fi
+
+if	[[ $var2 = core ]] || [[ $var2 = extra ]]; then
+	wget -qP /tmp/getpb/"${1}" https://git.archlinux.org/svntogit/packages.git/plain/"${1}"/repos/"${var2}"-x86_64/PKGBUILD
+fi
+
+
+	cd /tmp/getpb/"${1}"
+	makepkg --printsrcinfo >SCRINFO  2>/dev/null
+
+	echo PKGBUILD AND SCRINFO are in /tmp/getpb/"${1}"
+	echo
+
+	cat /tmp/getpb/"${1}"/PKGBUILD*
