@@ -1,9 +1,14 @@
 #!/bin/bash
-# getpb 2018-12-05
+# getpb 2018-12-06
 # fetches PKGBUILD's and creates SCRINFO for official or AUR packages.
 #
 # [[ $var2 = aur ]] is for my local "aur" repo. Set this as required.
 #
+
+if	[[ -z $1 ]]; then echo " Need a package to work with....";  echo \
+        "                                 Usage: getpb <package>"
+	exit
+fi
 
 var2=$(sudo pacman -Si "${1}" 2>/dev/null | awk '/Repository/ {print $3}')
 
@@ -26,10 +31,9 @@ fi
 
 
 	cd /tmp/getpb/"${1}"
-	makepkg --printsrcinfo >SCRINFO  2>/dev/null
+	makepkg --printsrcinfo >SCRINFO
 
 	echo PKGBUILD AND SCRINFO are in /tmp/getpb/"${1}"
 	echo
 
-	cat /tmp/getpb/"${1}"/PKGBUILD*
-
+	cat /tmp/getpb/"${1}"/PKGBUILD
