@@ -1,39 +1,95 @@
 #!/bin/bash
-# getpb 2018-12-06
-# fetches PKGBUILD's and creates SCRINFO for official or AUR packages.
+# getpb 2019-02-23
+# prints PKGBUILD and optionally SCRINFO for official, AUR, and AUR VCS packages.
 #
 # [[ $var2 = aur ]] is for my local "aur" repo. Set this as required.
-#
 
-if	[[ -z $1 ]]; then echo " Need a package to work with....";  echo \
-        "                                 Usage: getpb <package>"
+help () {
+	echo "
+
+ getpb returns PKGBUILD and optionally SCRINFO for official and AUR packages
+
+ Usage: getpb [option] <package-name>
+ Options:
+	-S  = Print SCRINFO
+	-Sv = Print SCRINFO for VCS AUR packages. (Build dep's need installed)
+"
 	exit
-fi
+}
 
-var2=$(sudo pacman -Si "${1}" 2>/dev/null | awk '/Repository/ {print $3}')
+main (){
 
-if	[[ -d /tmp/getpb/"${1}" ]]; then sudo rm -rd /tmp/getpb/"${1}"
+var2=$(sudo pacman -Si "${P}" 2>/dev/null | awk '/Repository/ {print $3}')
+
+if	[[ -d /tmp/getpb/"${P}" ]]; then 
+	sudo rm -rd /tmp/getpb/"${P}"
 fi
 
 if	[[ -z $var2 ]] || [[ $var2 = aur ]]; then
-	wget -qP /tmp/getpb/"${1}" https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h="$1"
-	mv /tmp/getpb/"${1}"/PKGBUILD*  /tmp/getpb/"${1}"/PKGBUILD
+	wget -qP /tmp/getpb/"${P}" https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h="${P}"
+	mv /tmp/getpb/"${P}"/PKGBUILD*  /tmp/getpb/"${P}"/PKGBUILD 2>/dev/null
 fi
 
 if	[[ $var2 = community ]]; then
-	wget -qP /tmp/getpb/"${1}" https://git.archlinux.org/svntogit/community.git/plain/trunk/PKGBUILD?h=packages/"${1}"
-	mv /tmp/getpb/"${1}"/PKGBUILD*  /tmp/getpb/"${1}"/PKGBUILD
+	wget -qP /tmp/getpb/"${P}" https://git.archlinux.org/svntogit/community.git/plain/trunk/PKGBUILD?h=packages/"${P}"
+	mv /tmp/getpb/"${P}"/PKGBUILD*  /tmp/getpb/"${P}"/PKGBUILD 2>/dev/null
 fi
 
 if	[[ $var2 = core ]] || [[ $var2 = extra ]]; then
-	wget -qP /tmp/getpb/"${1}" https://git.archlinux.org/svntogit/packages.git/plain/"${1}"/repos/"${var2}"-x86_64/PKGBUILD
+	wget -qP /tmp/getpb/"${P}" https://git.archlinux.org/svntogit/packages.git/plain/"${P}"/repos/"${var2}"-x86_64/PKGBUILD
 fi
+	touch /tmp/getpb/"${P}"/"${P}".install
+	cd /tmp/getpb/"${P}" 2>/dev/null
+	makepkg --printsrcinfo &>SCRINFO
+
+	cat /tmp/getpb/"${P}"/PKGBUILD 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; } ; echo
+}
+
+scr (){
+	echo "--------------------------------------------"
+	echo "                 SCRINFO " ; echo
+	cat /tmp/getpb/"${P}"/SCRINFO 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
+	exit
+}
+	#============================================== AUR VCS ==============================================
+vcs(){
+	makepkg -o --needed --noconfirm	2>/tmp/getpb/"${P}"/iferror
+	makepkg --printsrcinfo &>SCRINFO
+
+if	[[ -n $(grep ERROR: /tmp/getpb/"${P}"/iferror 2>/dev/null) ]]; then
+	echo "--------------------------------------------"
+	echo "                 SCRINFO " ; echo
+	echo "Current SCRINFO unavailable because running the following failed with..." ; echo
+	echo 'makepkg -o --needed --noconfirm'
+	cat /tmp/getpb/"${P}"/iferror ; echo
+	echo; echo "If you need current SCRINFO, correct issues and re-run getpb" ; echo
+	echo "--------------------------------------------"
+	echo "            Available SCRINFO " ; echo
+	cat /tmp/getpb/"${P}"/SCRINFO 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
+
+	else
+
+	echo "--------------------------------------------"
+	echo "                 SCRINFO " ; echo
+	cat /tmp/getpb/"${P}"/SCRINFO 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
+fi
+}
+	### Run help on [blank] $1
+if	[[ -z $1 ]]; then help ; fi
+	### Run "main" function to print PKGBUILD as default
+if	[[ -z $2 && $1 != -h && $1 != --help ]]; then P="${1}" ; main ; fi
+
+while	:; do
+	case "${1}" in
+	  -S)			P=$2 ; main ; scr				;;
+	 -Sv)			P=$2 ; main ; vcs				;;
+	 -h|--help)		help						;;
+	 -?*)			echo "Error, see -h or --help or try again"	;;
+	   *)	break
+	esac
+    shift
+done
+	
 
 
-	cd /tmp/getpb/"${1}"
-	makepkg --printsrcinfo >SCRINFO
 
-	echo PKGBUILD AND SCRINFO are in /tmp/getpb/"${1}"
-	echo
-
-	cat /tmp/getpb/"${1}"/PKGBUILD
