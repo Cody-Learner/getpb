@@ -2,7 +2,6 @@
 # getpb 2019-02-23
 # prints PKGBUILD and optionally SCRINFO for official, AUR, and AUR VCS packages.
 #
-# [[ $var2 = aur ]] is for my local "aur" repo. Set this as required.
 
 help () {
 	echo "
@@ -24,7 +23,7 @@ var2=$(sudo pacman -Si "${P}" 2>/dev/null | awk '/Repository/ {print $3}')
 if	[[ -d /tmp/getpb/"${P}" ]]; then 
 	sudo rm -rd /tmp/getpb/"${P}"
 fi
-
+	### [[ $var2 = aur ]] is set for my local "aur" repo. Set this as required.
 if	[[ -z $var2 ]] || [[ $var2 = aur ]]; then
 	wget -qP /tmp/getpb/"${P}" https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h="${P}"
 	mv /tmp/getpb/"${P}"/PKGBUILD*  /tmp/getpb/"${P}"/PKGBUILD 2>/dev/null
