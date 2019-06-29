@@ -9,6 +9,6 @@ Usage: getpb [Operation] \<package-name\>						<br>
 											<br>
  Operations:										<br>
 	-S  = Print SRCINFO								<br>
-	-Sv = Print SRCINFO for VCS AUR packages (Build dep's need installed)		<br>
+	-Sv = Print SRCINFO for VCS AUR packages (makedepends need installed)		<br>
 	-Md = List makedepends 								<br>
 											<br>
