@@ -1,17 +1,18 @@
 #!/bin/bash
-# getpb 2019-02-23
-# prints PKGBUILD and optionally SCRINFO for official, AUR, and AUR VCS packages.
+# getpb 2019-06-29
+# prints PKGBUILD and optionally .SRCINFO and builddepends for official, AUR, and AUR VCS packages.
 #
 
 help () {
 	echo "
 
- getpb returns PKGBUILD and optionally SCRINFO for official and AUR packages
+ getpb is an Arch package information gathering tool for official and AUR packages.
 
  Usage: getpb [option] <package-name>
  Options:
-	-S  = Print SCRINFO
-	-Sv = Print SCRINFO for VCS AUR packages. (Build dep's need installed)
+	-S  = Print .SRCINFO
+	-Sv = Print .SRCINFO for VCS AUR packages. (Build dep's need installed)
+	-Md = List makedepends.
 "
 	exit
 }
@@ -23,7 +24,8 @@ var2=$(sudo pacman -Si "${P}" 2>/dev/null | awk '/Repository/ {print $3}')
 if	[[ -d /tmp/getpb/"${P}" ]]; then 
 	sudo rm -rd /tmp/getpb/"${P}"
 fi
-	### [[ $var2 = aur ]] is set for my local "aur" repo. Set this as required.
+    		      ###     var2 = aur   is my local "aur" repo. Set this as required ###
+
 if	[[ -z $var2 ]] || [[ $var2 = aur ]]; then
 	wget -qP /tmp/getpb/"${P}" https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h="${P}"
 	mv /tmp/getpb/"${P}"/PKGBUILD*  /tmp/getpb/"${P}"/PKGBUILD 2>/dev/null
@@ -37,58 +39,111 @@ fi
 if	[[ $var2 = core ]] || [[ $var2 = extra ]]; then
 	wget -qP /tmp/getpb/"${P}" https://git.archlinux.org/svntogit/packages.git/plain/"${P}"/repos/"${var2}"-x86_64/PKGBUILD
 fi
-	touch /tmp/getpb/"${P}"/"${P}".install
-	cd /tmp/getpb/"${P}" 2>/dev/null
-	makepkg --printsrcinfo &>SCRINFO
-
+	echo "
+	PKGBUILD:
+	"
 	cat /tmp/getpb/"${P}"/PKGBUILD 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; } ; echo
+
+	echo "
+	END PKGBUILD:
+	"
 }
 
-scr (){
-	echo "--------------------------------------------"
-	echo "                 SCRINFO " ; echo
-	cat /tmp/getpb/"${P}"/SCRINFO 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
-	exit
+src (){
+	echo "  ========================================================="
+
+	cd /tmp/getpb/"${P}" 2>/dev/null || exit
+
+#### Check if an install script is listed in PKGBUILD. "makepkg --printsrcinfo" will fail if it's missing. ####
+#### Fetch snapshot and use it's .SRCINFO.
+
+if	grep -q 'install=' PKGBUILD ; then
+	wget https://aur.archlinux.org/cgit/aur.git/snapshot/"${P}".tar.gz 	&>/dev/null
+	tar xvzf "${P}".tar.gz							&>/dev/null
+
+	echo "
+ 	.SRCINFO:
+	"
+	cat /tmp/getpb/"${P}"/"${P}"/.SRCINFO 2>/dev/null || { echo "${P} .SRCINFO UNAVAILABLE" ; exit 1 ; }
+
+	echo "
+ 	END .SRCINFO:
+	"
+	printmessage
+	exit	
+fi
+	makepkg --printsrcinfo &>.SRCINFO
+
+	echo "
+ 	.SRCINFO:
+	"
+	cat /tmp/getpb/"${P}"/.SRCINFO 2>/dev/null || { echo "${P} .SRCINFO UNAVAILABLE" ; exit 1 ; }
+
+	echo "
+ 	END .SRCINFO:
+	"
+	printmessage
 }
-	#============================================== AUR VCS ==============================================
 vcs(){
+	echo "  ========================================================="
+
+	cd /tmp/getpb/"${P}" 2>/dev/null || exit
+
+#### Check if an install script is listed in PKGBUILD. "makepkg --printsrcinfo" will fail if it's missing. ####
+#### Fetch snapshot and run makepkg --printsrcinfo &>.SRCINFO.
+
+
+if	grep -q 'install=' PKGBUILD; then
+	wget https://aur.archlinux.org/cgit/aur.git/snapshot/"${P}".tar.gz
+	tar xvzf "${P}".tar.gz
+	cd /tmp/getpb/"${P}"/"${P}"/ || exit
+fi
 	makepkg -o --needed --noconfirm	2>/tmp/getpb/"${P}"/iferror
-	makepkg --printsrcinfo &>SCRINFO
+	makepkg --printsrcinfo &>.SRCINFO
 
-if	[[ -n $(grep ERROR: /tmp/getpb/"${P}"/iferror 2>/dev/null) ]]; then
-	echo "--------------------------------------------"
-	echo "                 SCRINFO " ; echo
-	echo "Current SCRINFO unavailable because running the following failed with..." ; echo
-	echo 'makepkg -o --needed --noconfirm'
-	cat /tmp/getpb/"${P}"/iferror ; echo
-	echo; echo "If you need current SCRINFO, correct issues and re-run getpb" ; echo
-	echo "--------------------------------------------"
-	echo "            Available SCRINFO " ; echo
-	cat /tmp/getpb/"${P}"/SCRINFO 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
+if	grep -q ERROR: /tmp/getpb/"${P}"/iferror ; then
 
-	else
+	echo; echo "Generating current .SRCINFO with "makepkg --printsrcinfo"  failed with."; echo
 
-	echo "--------------------------------------------"
-	echo "                 SCRINFO " ; echo
-	cat /tmp/getpb/"${P}"/SCRINFO 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
+	cat /tmp/getpb/"${P}"/.SRCINFO 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
+
+    else
+	echo "
+	.SRCINFO 
+	"
+	cat /tmp/getpb/"${P}"/.SRCINFO 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
+
+	echo "
+	END .SRCINFO 
+	"
+	printmessage
 fi
 }
+
+printmessage (){
+
+echo "
+ Files are available in /tmp/getpb/${P}
+"
+}
 	### Run help on [blank] $1
-if	[[ -z $1 ]]; then help ; fi
+if	[[ -z $1 ]]; then help
+fi
 	### Run "main" function to print PKGBUILD as default
-if	[[ -z $2 && $1 != -h && $1 != --help ]]; then P="${1}" ; main ; fi
+if	[[ -z $2 && $1 != -h && $1 != --help ]]; then P="${1}" ; main 
+fi
 
 while	:; do
 	case "${1}" in
-	  -S)			P=$2 ; main ; scr				;;
-	 -Sv)			P=$2 ; main ; vcs				;;
-	 -h|--help)		help						;;
-	 -?*)			echo "Error, see -h or --help or try again"	;;
+	  -S)			P=$2 ; main ; src									;;
+	 -Sv)			P=$2 ; main ; vcs									;;
+	 -Md)			P=$2 ; main >/dev/null ; echo ; src | awk '/makedepends/ {print $3}' ; printmessage	;;
+	 -h|--help)		help											;;
+	 -?*)			echo "Error, see -h or --help or try again"						;;
 	   *)	break
 	esac
     shift
 done
 	
-
 
 
