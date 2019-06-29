@@ -105,7 +105,7 @@ if	grep -q ERROR: /tmp/getpb/"${P}"/iferror ; then
 
 	echo; echo "Generating current .SRCINFO with "makepkg --printsrcinfo"  failed with."; echo
 
-	cat /tmp/getpb/"${P}"/.SRCINFO 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
+	cat /tmp/getpb/"${P}"/iferror 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
 
     else
 	echo "
