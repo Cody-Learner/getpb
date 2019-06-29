@@ -4,7 +4,7 @@ Getpb is an Arch package information gathering tool for official and AUR package
 											<br>
 Depends: base-devel wget								<br>
 											<br>
-Usage: getpb [Operation] <package-name>							<br>
+Usage: getpb [Operation] \<package-name\>						<br>
  getpb defaults to printing PKGBUILD							<br>
 											<br>
  Operations:										<br>
