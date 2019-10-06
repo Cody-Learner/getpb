@@ -37,7 +37,8 @@ if	[[ $var2 = community ]]; then
 fi
 
 if	[[ $var2 = core ]] || [[ $var2 = extra ]]; then
-	wget -qP /tmp/getpb/"${P}" https://git.archlinux.org/svntogit/packages.git/plain/"${P}"/repos/"${var2}"-x86_64/PKGBUILD
+	wget -qP /tmp/getpb/"${P}" https://git.archlinux.org/svntogit/packages.git/plain/"${P}"/repos/"${var2}"-x86_64/PKGBUILD || \
+	wget -qP /tmp/getpb/"${P}" https://git.archlinux.org/svntogit/packages.git/plain/"${P}"/repos/"${var2}"-any/PKGBUILD
 fi
 	echo "
 	PKGBUILD:
