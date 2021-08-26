@@ -1,150 +1,197 @@
 #!/bin/bash
-# getpb 2019-06-29
-# prints PKGBUILD and optionally .SRCINFO and builddepends for official, AUR, and AUR VCS packages.
-#
+# getpb 2021-08-24
+# Dependancies: base-devel asp expac auracle
 
-help () {
+#----------------------------------------------------------------------
+### Set variables ###
+
+P="${2}"
+basedir="/tmp/getpb" 		; if [[ ! -d ${basedir} ]]; then mkdir -p "${basedir}"; fi
+builddir="${basedir}"/"${P}"
+
+#----------------------------------------------------------------------
+
+help (){
 	echo "
-
  getpb is an Arch package information gathering tool for official and AUR packages.
 
  Usage: getpb [option] <package-name>
  Options:
-	-S  = Print .SRCINFO
-	-Sv = Print .SRCINFO for VCS AUR packages. (Build dep's need installed)
-	-Md = List makedepends.
+	-p  = Print PKGBUILD
+	-s  = Print .SRCINFO
+	-m  = List makedepends
+	-h  = Help
 "
+}
+
+#----------------------------------------------------------------------
+### Set official or AUR package ###
+
+setrepo (){
+
+### Official or AUR repo ###
+
+if	pkg=$(auracle search ^"${P}"$) && [[ -n ${pkg} ]] ; then
+	repo=AUR
+
+   elif	expac -S '%n' "${P}" &>/dev/null ; then
+	repo=OFFICIAL
+
+   else
+	echo "	Package NA"
 	exit
+fi
 }
 
-main (){
+#----------------------------------------------------------------------
+### Fetch PKGBUILD ###
 
-var2=$(sudo pacman -Si "${P}" 2>/dev/null | awk '/Repository/ {print $3}')
+pbuild (){
 
-if	[[ -d /tmp/getpb/"${P}" ]]; then 
-	sudo rm -rd /tmp/getpb/"${P}"
+	cd "${basedir}" || exit
+
+if	[[ ${repo} == OFFICIAL ]] ; then
+
+   	if	find "${builddir}" -type d &>/dev/null && find "${builddir}"/PKGBUILD -type f &>/dev/null ; then
+		: 								# exit if statement so option parser can print it
+	    else
+		asp export &>/dev/null "$(expac -S '%r/%n' "${P}")"
+    	fi
 fi
-    		      ###     var2 = aur   is my local "aur" repo. Set this as required ###
+if	[[ ${repo} == AUR ]] ; then
 
-if	[[ -z $var2 ]] || [[ $var2 = aur ]]; then
-	wget -qP /tmp/getpb/"${P}" https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h="${P}"
-	mv /tmp/getpb/"${P}"/PKGBUILD*  /tmp/getpb/"${P}"/PKGBUILD 2>/dev/null
+   	if	find "${builddir}" -type d &>/dev/null && find "${builddir}"/PKGBUILD -type f &>/dev/null ; then
+		: 								# exit if statement so option parser can print it
+	    else
+		mkdir -p "${builddir}"
+		cd "${builddir}" || exit	
+		auracle show "${P}" --show-file PKGBUILD >PKGBUILD
+	fi
 fi
+}
 
-if	[[ $var2 = community ]]; then
-	wget -qP /tmp/getpb/"${P}" https://git.archlinux.org/svntogit/community.git/plain/trunk/PKGBUILD?h=packages/"${P}"
-	mv /tmp/getpb/"${P}"/PKGBUILD*  /tmp/getpb/"${P}"/PKGBUILD 2>/dev/null
-fi
+#----------------------------------------------------------------------
+### Print PKGBUILD ###
 
-if	[[ $var2 = core ]] || [[ $var2 = extra ]]; then
-	wget -qP /tmp/getpb/"${P}" https://git.archlinux.org/svntogit/packages.git/plain/"${P}"/repos/"${var2}"-x86_64/PKGBUILD || \
-	wget -qP /tmp/getpb/"${P}" https://git.archlinux.org/svntogit/packages.git/plain/"${P}"/repos/"${var2}"-any/PKGBUILD
-fi
-	echo "
-	PKGBUILD:
+printpb (){
+
+	cd "${builddir}" || exit
+
+	echo ; echo " BEGIN PKGBUILD
 	"
-	cat /tmp/getpb/"${P}"/PKGBUILD 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; } ; echo
+	cat PKGBUILD
 
-	echo "
-	END PKGBUILD:
+	echo ; echo " END PKGBUILD
 	"
 }
 
-src (){
-	echo "  ========================================================="
+#----------------------------------------------------------------------
+### Create .SRCINFO ###
 
-	cd /tmp/getpb/"${P}" 2>/dev/null || exit
+srcinfo (){
 
-#### Check if an install script is listed in PKGBUILD. "makepkg --printsrcinfo" will fail if it's missing. ####
-#### Fetch snapshot and use it's .SRCINFO.
+	cd "${basedir}" || exit
 
-if	grep -q 'install=' PKGBUILD ; then
-	wget https://aur.archlinux.org/cgit/aur.git/snapshot/"${P}".tar.gz 	&>/dev/null
-	tar xvzf "${P}".tar.gz							&>/dev/null
+if	[[ ${repo} == OFFICIAL ]] || [[ ${repo} == AUR ]] ; then
 
-	echo "
- 	.SRCINFO:
-	"
-	cat /tmp/getpb/"${P}"/"${P}"/.SRCINFO 2>/dev/null || { echo "${P} .SRCINFO UNAVAILABLE" ; exit 1 ; }
+	if	find "${builddir}" -type d &>/dev/null && find "${builddir}"/PKGBUILD -type f &>/dev/null ; then
+		cd "${builddir}" || exit
 
-	echo "
- 	END .SRCINFO:
-	"
-	printmessage
-	exit	
+		if	find .SRCINFO -type f &>/dev/null ; then
+			:							# exit if statement so option parser can print it
+		    else
+			echo ; echo " Gathering data to generate .SRCFILE . . . . .
+			"
+			makepkg --printsrcinfo >.SRCINFO || tryharder
+		fi
+	    else
+		pbuild
+		srcinfo
+    	fi
+
 fi
-	makepkg --printsrcinfo &>.SRCINFO
-
-	echo "
- 	.SRCINFO:
-	"
-	cat /tmp/getpb/"${P}"/.SRCINFO 2>/dev/null || { echo "${P} .SRCINFO UNAVAILABLE" ; exit 1 ; }
-
-	echo "
- 	END .SRCINFO:
-	"
-	printmessage
 }
-vcs(){
-	echo "  ========================================================="
 
-	cd /tmp/getpb/"${P}" 2>/dev/null || exit
+#----------------------------------------------------------------------
+### If makepkg errors/exits for missing files, git clone ###
 
-#### Check if an install script is listed in PKGBUILD. "makepkg --printsrcinfo" will fail if it's missing. ####
-#### Fetch snapshot and run makepkg --printsrcinfo &>.SRCINFO.
+tryharder (){
 
+red='\033[0;91m'
+bold='\033[1m'
+none='\033[00m'
 
-if	grep -q 'install=' PKGBUILD; then
-	wget https://aur.archlinux.org/cgit/aur.git/snapshot/"${P}".tar.gz
-	tar xvzf "${P}".tar.gz
-	cd /tmp/getpb/"${P}"/"${P}"/ || exit
-fi
-	makepkg -o --needed --noconfirm	2>/tmp/getpb/"${P}"/iferror
-	makepkg --printsrcinfo &>.SRCINFO
+	echo; echo -e ${red} ${bold}" Makepkg choked. Git cloning package to obtain required data." ${none}
+	echo
+	cd "${basedir}"
+	rm -rd "${builddir}"
+	auracle clone "${P}"	
+}
 
-if	grep -q ERROR: /tmp/getpb/"${P}"/iferror ; then
+#----------------------------------------------------------------------
+### Print .SRCFILE ###
 
-	echo; echo "Generating current .SRCINFO with "makepkg --printsrcinfo"  failed with."; echo
+printsrc (){
 
-	cat /tmp/getpb/"${P}"/iferror 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
+	cd "${builddir}" || exit
+
+	echo ; echo " BEGIN .SRCINFO
+	"
+	cat .SRCINFO
+
+	echo ; echo " END .SRCINFO
+	"
+}
+
+#----------------------------------------------------------------------
+### Prepare for and print make depends ###
+
+makedeps (){
+
+	cd "${basedir}" || exit
+
+if	find "${builddir}" -type d &>/dev/null && find "${builddir}"/.SRCINFO -type f &>/dev/null ; then
+	cd "${builddir}" || exit
+
+	echo ; echo " Make Dependencies:
+	"
+	awk '/makedepends/ {print $3}' .SRCINFO
 
     else
-	echo "
-	.SRCINFO 
-	"
-	cat /tmp/getpb/"${P}"/.SRCINFO 2>/dev/null || { echo "${P} UNAVAILABLE" ; exit 1 ; }
 
-	echo "
-	END .SRCINFO 
-	"
-	printmessage
+	cd "${basedir}" || exit
+	pbuild
+	srcinfo
+	makedeps
 fi
+
 }
 
-printmessage (){
+#----------------------------------------------------------------------
+### Print where files are ###
 
-echo "
- Files are available in /tmp/getpb/${P}
-"
+printmes (){
+
+	echo ; echo " Files available in ${builddir}
+	"
 }
-	### Run help on [blank] $1
+
+#----------------------------------------------------------------------
+	### Run help on no arguments ###
+ 
 if	[[ -z $1 ]]; then help
 fi
-	### Run "main" function to print PKGBUILD as default
-if	[[ -z $2 && $1 != -h && $1 != --help ]]; then P="${1}" ; main 
-fi
+
+
+#======================================================================
 
 while	:; do
 	case "${1}" in
-	  -S)			P=$2 ; main ; src									;;
-	 -Sv)			P=$2 ; main ; vcs									;;
-	 -Md)			P=$2 ; main >/dev/null ; echo ; src | awk '/makedepends/ {print $3}' ; printmessage	;;
-	 -h|--help)		help											;;
-	 -?*)			echo "Error, see -h or --help or try again"						;;
-	   *)	break
+	  -p)			setrepo ; pbuild   ; printpb  ; printmes ;;
+	  -s)			setrepo ; srcinfo  ; printsrc ; printmes ;;
+	  -m)			setrepo ; makedeps            ; printmes ;;
+	  -h|--help)		help					 ;;
+	  *)	break							 ;;
 	esac
     shift
 done
-	
-
-
