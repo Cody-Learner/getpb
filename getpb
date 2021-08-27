@@ -1,5 +1,6 @@
 #!/bin/bash
-# getpb 2021-08-24
+# package information gathering tool
+# getpb 2021-08-27
 # Dependencies: base-devel asp expac auracle
 
 #----------------------------------------------------------------------
@@ -15,8 +16,8 @@ help (){
 	echo "
  getpb is an Arch package information gathering tool for official and AUR packages.
 
- Usage: getpb [option] <package-name>
- Options:
+ Usage: getpb [operation] <package-name>
+ Operations:
 	-p  = Print PKGBUILD
 	-s  = Print .SRCINFO
 	-m  = List makedepends
@@ -38,7 +39,7 @@ if	pkg=$(auracle search ^"${P}"$) && [[ -n ${pkg} ]] ; then
 	repo=OFFICIAL
 
    else
-	echo "	Package NA"
+	echo '# Package NA '
 	exit
 fi
 }
@@ -50,19 +51,15 @@ pbuild (){
 
 	cd "${basedir}" || exit
 
-if	[[ ${repo} == OFFICIAL ]] ; then
+if	find "${builddir}" -type d &>/dev/null && find "${builddir}"/PKGBUILD -type f &>/dev/null ; then
+	: 											# exit if statement so option parser can print it
+    else
 
-   	if	find "${builddir}" -type d &>/dev/null && find "${builddir}"/PKGBUILD -type f &>/dev/null ; then
-		: 								# exit if statement so option parser can print it
-	    else
+	if	[[ ${repo} == OFFICIAL ]] ; then
 		asp export &>/dev/null "$(expac -S '%r/%n' "${P}")"
     	fi
-fi
-if	[[ ${repo} == AUR ]] ; then
 
-   	if	find "${builddir}" -type d &>/dev/null && find "${builddir}"/PKGBUILD -type f &>/dev/null ; then
-		: 								# exit if statement so option parser can print it
-	    else
+	if	[[ ${repo} == AUR ]] ; then
 		mkdir -p "${builddir}"
 		cd "${builddir}" || exit	
 		auracle show "${P}" --show-file PKGBUILD >PKGBUILD
@@ -77,12 +74,12 @@ printpb (){
 
 	cd "${builddir}" || exit
 
-	echo ; echo " BEGIN PKGBUILD
-	"
+	echo ; echo '###  BEGIN PKGBUILD ###
+	'
 	cat PKGBUILD
 
-	echo ; echo " END PKGBUILD
-	"
+	echo ; echo '###  END PKGBUILD ###
+	'
 }
 
 #----------------------------------------------------------------------
@@ -98,10 +95,10 @@ if	[[ ${repo} == OFFICIAL ]] || [[ ${repo} == AUR ]] ; then
 		cd "${builddir}" || exit
 
 		if	find .SRCINFO -type f &>/dev/null ; then
-			:							# exit if statement so option parser can print it
+			:									# exit if statement so option parser can print it
 		    else
-			echo ; echo " Gathering data to generate .SRCFILE . . . . .
-			"
+			echo ; echo '# Gathering data to generate .SRCFILE . . . . .
+			'
 			makepkg --printsrcinfo >.SRCINFO || tryharder
 		fi
 	    else
@@ -113,7 +110,7 @@ fi
 }
 
 #----------------------------------------------------------------------
-### If makepkg errors/exits for missing files, git clone ###
+### If makepkg errors/exits, git clone ###
 
 tryharder (){
 
@@ -121,7 +118,7 @@ red='\033[0;91m'
 bold='\033[1m'
 none='\033[00m'
 
-	echo; echo -e ${red} ${bold}" Makepkg choked. Git cloning package to obtain required data." ${none}
+	echo; echo -e ${red}${bold}"# Makepkg error. Git cloning package source obtain required data." ${none}
 	echo
 	cd "${basedir}"
 	rm -rd "${builddir}"
@@ -135,12 +132,12 @@ printsrc (){
 
 	cd "${builddir}" || exit
 
-	echo ; echo " BEGIN .SRCINFO
-	"
+	echo ; echo '###  BEGIN .SRCINFO ###
+	'
 	cat .SRCINFO
 
-	echo ; echo " END .SRCINFO
-	"
+	echo ; echo '###  END .SRCINFO ###
+	'
 }
 
 #----------------------------------------------------------------------
@@ -153,8 +150,8 @@ makedeps (){
 if	find "${builddir}" -type d &>/dev/null && find "${builddir}"/.SRCINFO -type f &>/dev/null ; then
 	cd "${builddir}" || exit
 
-	echo ; echo " Make Dependencies:
-	"
+	echo ; echo '# Make Dependencies:
+	'
 	awk '/makedepends/ {print $3}' .SRCINFO
 
     else
@@ -164,7 +161,6 @@ if	find "${builddir}" -type d &>/dev/null && find "${builddir}"/.SRCINFO -type f
 	srcinfo
 	makedeps
 fi
-
 }
 
 #----------------------------------------------------------------------
@@ -172,16 +168,15 @@ fi
 
 printmes (){
 
-	echo ; echo " Files available in ${builddir}
+	echo ; echo '#' "Files available in ${builddir}
 	"
 }
 
 #----------------------------------------------------------------------
-	### Run help on no arguments ###
+### Run help on no arguments ###
  
 if	[[ -z $1 ]]; then help
 fi
-
 
 #======================================================================
 
